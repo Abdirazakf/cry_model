@@ -7,11 +7,11 @@ from sklearn.metrics import classification_report, confusion_matrix
 from tensorflow.image import resize
 from tensorflow.keras.utils import to_categorical
 
-data_dir = 'C:/Users/abdirazak/Downloads/donateacry_corpus/'
+data_dir = '/home/grp4pi/AIFiles/cry_model/donateacry_corpus/'
 classes = ['belly_pain', 'burping', 'discomfort', 'hungry', 'tired']
 target_shape = (128, 128)
 
-model = load_model('C:/Users/abdirazak/Downloads/my_cry_classification_model_improved.h5')
+model = load_model('/home/grp4pi/AIFiles/cry_model/my_cry_classification_model_improved.h5')
 
 def load_and_preprocess_data(data_dir, classes, target_shape=(128, 128)):
     data = []
