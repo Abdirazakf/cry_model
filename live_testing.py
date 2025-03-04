@@ -36,7 +36,7 @@ mqtt_client.loop_start()
 def preprocess_audio(indata, sample_rate=16000, target_shape=(128, 128)):
     """Convert audio data to Mel Spectrogram."""
     if len(indata) < 512:
-        return None  # Skip processing for very short samples
+        return None
 
     mel_spectrogram = librosa.feature.melspectrogram(y=indata, sr=sample_rate, n_fft=512)
     mel_spectrogram = librosa.power_to_db(mel_spectrogram, ref=np.max)
