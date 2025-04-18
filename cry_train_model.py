@@ -12,7 +12,7 @@ from tensorflow.image import resize
 from tensorflow.keras.models import load_model
 
 data_dir = '/home/grp4pi/AIFiles/cry_model/donateacry_corpus'
-classes = ['belly_pain', 'burping', 'discomfort', 'hungry', 'tired']
+classes = ['belly_pain', 'burping', 'discomfort', 'hungry', 'tired','no_cry']
 
 # Function to load and preprocess data 
 def load_and_preprocess_data(data_dir, classes, target_shape=(128, 128)):

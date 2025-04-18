@@ -1,66 +1,55 @@
 #!/usr/bin/env python3
 import sys
 import os
+
 import numpy as np
 import librosa
 import tensorflow as tf
-from huggingface_hub import from_pretrained_keras
+from tensorflow.keras.models import load_model
 
 # ——— Configuration ———
 CLASSIFIER_PATH = "/home/grp4pi/AIFiles/cry_model/my_cry_classification_model_improved.keras"
-CRY_CLASSES = ["belly_pain", "burping", "discomfort", "hungry", "tired"]
-CRY_THRESHOLD = 0.5              # p_cry above this => “cry”
-TARGET_SHAPE = (128, 126)        # height × width for both models
-
-# ——— Load Models ———
-print("Loading cry-vs-not-cry model…")
-cry_model = from_pretrained_keras("ericcbonet/cry-baby")
-print("Loading 5‑way classification model…")
-classify_model = tf.keras.models.load_model(CLASSIFIER_PATH)
+CLASSES         = ['belly_pain', 'burping', 'discomfort', 'hungry', 'tired', 'no_cry']
+TARGET_SHAPE    = (128, 128)   # height, width
 
 # ——— Preprocessing ———
-def preprocess_mel(wav_path, target_shape=TARGET_SHAPE):
-    """Load WAV @16 kHz, make mel spectrogram, convert to dB, resize to target_shape, add batch+channel."""
-    y, sr = librosa.load(wav_path, sr=16000)
-    mel = librosa.feature.melspectrogram(y=y, sr=sr, n_fft=512, n_mels=target_shape[0])
-    mel_db = librosa.power_to_db(mel, ref=np.max)
-    # (128, t) → (128, t, 1)
-    t = tf.convert_to_tensor(mel_db[..., None], dtype=tf.float32)
-    # → (128,126,1)
-    t = tf.image.resize(t, target_shape, method="bilinear", antialias=True)
-    # → (1,128,126,1)
-    return t[None, ...]
+def preprocess_audio(file_path, target_shape=TARGET_SHAPE):
+    """
+    1) Load audio at its native sampling rate
+    2) Compute a 128‑band mel spectrogram
+    3) Expand dims for channel, then resize to target_shape
+    4) Add batch dimension → (1, H, W, 1)
+    """
+    y, sr = librosa.load(file_path, sr=None)
+    mel_spec = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=target_shape[0])
+    mel_spec = np.expand_dims(mel_spec, axis=-1)                      # (128, t, 1)
+    mel_tensor = tf.convert_to_tensor(mel_spec, dtype=tf.float32)
+    mel_resized = tf.image.resize(mel_tensor, target_shape)           # (128,128,1)
+    return tf.expand_dims(mel_resized, axis=0)                        # (1,128,128,1)
 
-# ——— Test Loop ———
-def test_files(wav_paths):
+# ——— Main Test Loop ———
+def main(wav_paths):
+    # Load your 6‑way classification model
+    model = load_model(CLASSIFIER_PATH)
+
     for path in wav_paths:
         if not os.path.isfile(path):
             print(f"[ERROR] File not found: {path}")
             continue
 
-        print(f"\n=== {os.path.basename(path)} ===")
-        # 1) cry-vs-not-cry (single sigmoid)
-        x = preprocess_mel(path)
-        preds = cry_model.predict(x)            # shape = (1,1)
-        p_cry = float(preds[0,0])
-        p_not = 1.0 - p_cry
-        label = "cry" if p_cry > CRY_THRESHOLD else "not_cry"
-        print(f" Cry-vs-not-cry → [not_cry={p_not:.3f}, cry={p_cry:.3f}] → {label}")
+        # Preprocess and predict
+        x = preprocess_audio(path)
+        preds = model.predict(x)[0]           # shape (6,)
+        idx   = int(np.argmax(preds))
+        probs = ", ".join(f"{p:.2f}" for p in preds)
 
-        # 2) if cry, run 5‑way classifier
-        if p_cry > CRY_THRESHOLD:
-            y = preprocess_mel(path)
-            preds5 = classify_model.predict(y)[0]  # shape = (5,)
-            idx5 = int(np.argmax(preds5))
-            probs5 = ", ".join(f"{p:.2f}" for p in preds5)
-            print(f" 5-way probs: [{probs5}]")
-            print(f" Predicted type: {CRY_CLASSES[idx5]}")
-        else:
-            print(" Skipping 5‑way classification (no cry detected)")
+        # Output
+        print(f"\n{os.path.basename(path)}")
+        print(f"  Probs: [{probs}]")
+        print(f"  → Predicted: {CLASSES[idx]}")
 
-# ——— Entry Point ———
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python cry_individual_test.py file1.wav [file2.wav ...]")
+        print("Usage: python cry_classify_only_test.py file1.wav [file2.wav ...]")
         sys.exit(1)
-    test_files(sys.argv[1:])
+    main(sys.argv[1:])
