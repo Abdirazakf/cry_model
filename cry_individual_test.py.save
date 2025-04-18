@@ -1,0 +1,32 @@
+
+# ——— Test Loop ———
+def test_files(wav_paths):
+    for path in wav_paths:
+        if not os.path.isfile(path):
+            print(f"[ERROR] File not found: {path}")
+            continue
+
+        # 1) cry-vs-not-cry
+        x = preprocess_mel(path)
+        preds = cry_model.predict(x)[0]   # shape (2,)
+        p_not, p_cry = float(preds[0]), float(preds[1])
+        label = "cry" if p_cry > CRY_THRESHOLD else "not_cry"
+        print(f"\n{os.path.basename(path)}")
+        print(f"  Cry-vs-not-cry → [not_cry={p_not:.3f}, cry={p_cry:.3f}] → {label}")
+
+        # 2) if cry, run 5‑way
+        if p_cry > CRY_THRESHOLD:
+            y = preprocess_mel(path)
+            preds5 = classify_model.predict(y)[0]  # shape (5,)
+            idx5 = int(np.argmax(preds5))
+            probs5 = ", ".join(f"{p:.2f}" for p in preds5)
+            print(f"  5-way probs: [{probs5}]")
+            print(f"  Predicted type: {CRY_CLASSES[idx5]}")
+        else:
+            print("  Skipping 5‑way classification (no cry detected)")
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python cry_individual_test.py file1.wav [file2.wav ...]")
+        sys.exit(1)
+    test_files(sys.argv[1:])

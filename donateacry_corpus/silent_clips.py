@@ -7,7 +7,7 @@ OUTPUT_FOLDER = "no_cry"
 SAMPLE_RATE = 16000       # Sampling rate in Hz
 CHANNELS = 1
 DURATION = 7              # Record duration for each clip in seconds
-CLIP_COUNT = 100           # How many clips to record
+CLIP_COUNT = 300           # How many clips to record
 
 def record_no_cry_clips():
     if not os.path.exists(OUTPUT_FOLDER):

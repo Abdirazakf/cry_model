@@ -11,7 +11,7 @@ from tensorflow.keras.utils import to_categorical
 from tensorflow.image import resize
 from tensorflow.keras.models import load_model
 
-data_dir = 'C:/Users/abdirazak/Downloads/donateacry_corpus/'
+data_dir = '/home/grp4pi/AIFiles/cry_model/donateacry_corpus'
 classes = ['belly_pain', 'burping', 'discomfort', 'hungry', 'tired']
 
 # Function to load and preprocess data 
@@ -50,4 +50,4 @@ model = Model(input_layer, output_layer)
 model.compile(optimizer=Adam(learning_rate=0.001), loss='categorical_crossentropy', metrics=['accuracy'])
 model.fit(X_train, y_train, epochs=30, batch_size=32, validation_data=(X_test, y_test))
 
-model.save('C:/Users/abdirazak/Downloads/my_cry_classification_model_improved.h5')
+model.save('/home/grp4pi/AIFiles/cry_model/my_cry_classification_model_improved.keras')
