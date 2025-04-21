@@ -5,18 +5,29 @@ import numpy as np
 import sounddevice as sd
 import librosa
 import tensorflow as tf
+import paho.mqtt.client as mqtt
 
-# ——— Configuration ———
 MODEL_PATH      = "/home/grp4pi/AIFiles/cry_model/my_cry_classification_model_improved.keras"
 CLASSES         = ['belly_pain', 'burping', 'discomfort', 'hungry', 'tired', 'no_cry']
-TARGET_SHAPE    = (128, 128)      # height, width
+TARGET_SHAPE    = (128, 128)
 CHUNK_DURATION  = 2.0             # seconds per chunk
 RMS_THRESHOLD   = 0.02            # filter out very quiet
-CONF_THRESHOLD  = 0.70            # require ≥70% confidence to report a real cry
+CONF_THRESHOLD  = 0.85            # require ≥70% confidence to report a real cry
 
-# ——— Load your 6‑way model ———
+MQTT_HOST       = "693754a8789c4419b4d760a2653cd86e.s1.eu.hivemq.cloud"
+MQTT_PORT       = 8883
+MQTT_TOPIC      = "baby_cry/classification"
+MQTT_USER       = "gp4pi"
+MQTT_PASS       = "Group4pi"
+
 print("Loading classification model…")
 model = tf.keras.models.load_model(MODEL_PATH)
+
+mqtt_client = mqtt.Client()
+mqtt_client.tls_set()
+mqtt_client.username_pw_set(MQTT_USER, MQTT_PASS)
+mqtt_client.connect(MQTT_HOST, MQTT_PORT, keepalive=60)
+mqtt_client.loop_start()
 
 # ——— Prepare audio queue & callback ———
 q = queue.Queue()
@@ -25,7 +36,6 @@ def audio_callback(indata, frames, time, status):
         print(f"[Audio status] {status}", file=sys.stderr)
     q.put(indata.copy())
 
-# ——— Helpers ———
 def is_significant(audio, thresh=RMS_THRESHOLD):
     return np.sqrt(np.mean(audio**2)) > thresh
 
@@ -50,7 +60,6 @@ def preprocess(chunk, sr_in, target_shape=TARGET_SHAPE):
     t = tf.image.resize(t, target_shape, method="bilinear", antialias=True)
     return tf.expand_dims(t, 0)  # (1, H, W, 1)
 
-# ——— Main Loop ———
 def main():
     sr_in = get_input_shape()
     print(f"Mic default samplerate: {sr_in} Hz")
@@ -69,18 +78,25 @@ def main():
                     continue
 
                 x = preprocess(chunk, sr_in)
-                preds = model.predict(x)[0]   # shape (6,)
+                preds = model.predict(x)[0]
                 idx   = int(np.argmax(preds))
                 label = CLASSES[idx]
                 conf  = preds[idx]
 
                 if label == "no_cry" or conf < CONF_THRESHOLD:
                     print("[no_cry]")
+                    mqtt_client.publish(MQTT_TOPIC, label)
                 else:
                     print(f"[{label:10s}] {conf*100:5.1f}%")
+                    mqtt_client.publish(MQTT_TOPIC, label)
+
     except KeyboardInterrupt:
         print("\nStopping live classification.")
         sys.exit(0)
+    finally:
+       mqtt_client.loop_stop()
+       mqtt_client.disconnect()
+       sys.exit(0)
 
 if __name__ == "__main__":
     main()
